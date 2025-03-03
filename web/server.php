@@ -19,6 +19,28 @@ if (
   exit();
 }
 
+
+// load env
+function loadEnv($filePath)
+{
+    if (!file_exists($filePath)) { return; }
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue; // Ignore comments
+        list($key, $value) = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if (!array_key_exists($key, $_ENV) && !array_key_exists($key, $_SERVER)) {
+            putenv("$key=$value");
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
+        }
+    }
+}
+// Load the .env file
+loadEnv(__DIR__ . '/.env');
+
+
 // token saving measures
 function token_saving($str) {
   $str = str_replace("===\n", '', $str);
@@ -994,9 +1016,11 @@ function getChatCompletion($system, $prompt) {
 
   $client = new Client(['base_uri' => 'https://api.openai.com']);
 
+  $openaiApiKey = getenv('OPENAI_API_KEY');
+
   $options = [
         'headers' => [
-            'Authorization' => 'Bearer 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',
+            'Authorization' => 'Bearer '.$openaiApiKey,
             'Content-Type' => 'application/json'
         ],
         'json' => [
