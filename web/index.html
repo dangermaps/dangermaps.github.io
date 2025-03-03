@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DangerMaps</title>
+
+<link rel="stylesheet" href="./js/leaflet/leaflet.css" />
+
+<style>
+#map {
+  height: 900px;
+  width: 100%;
+}
+</style>
+
+</head>
+<body>
+
+<div id="map"></div>
+
+<script type="text/javascript" src="./js/leaflet/leaflet.js"></script>
+<script type="text/javascript">
+
+// -------------
+// DEFAULTS
+// -------------
+
+// config
+let steps = 100;      // 100 sqaures
+let squareside = 75;  // square side in meters
+
+let city = null;
+
+// user demographics
+let gender = 'Man';
+let age = 35;
+let travelmode = 'solo';
+
+// starting coords (with default location)
+let coords = [62.89351306042706, 27.678989828577578];
+
+// -------------
+// INPUT OVERWRITE
+// -------------
+
+// initial location from GET params?
+const urlParams = new URLSearchParams(window.location.search);
+const get_coords = urlParams.get('coords');
+const get_steps = urlParams.get('steps');
+const get_squareside = urlParams.get('squareside');
+const get_gender = urlParams.get('gender');
+const get_age = urlParams.get('age');
+const get_travelmode = urlParams.get('travelmode');
+const get_city = urlParams.get('city');
+const get_datetime = urlParams.get('datetime');
+
+if (get_coords) {
+  coords = get_coords.split(',');
+  console.log("coords:", coords);
+}
+if (get_steps) {
+  steps = parseInt(get_steps, 10);
+  console.log("steps:", steps);
+}
+if (get_squareside) {
+  squareside = parseInt(get_squareside, 10);
+  console.log("squareside:", squareside);
+}
+if (get_gender) {
+  gender = get_gender;
+  console.log("gender:", gender);
+}
+if (get_age) {
+  age = parseInt(get_age, 10);
+  console.log("age:", age);
+}
+if (get_travelmode) {
+  travelmode = get_travelmode;
+  console.log("travelmode:", travelmode);
+}
+if (get_city) {
+  city = get_city;
+  console.log("city:", city);
+}
+if (get_datetime) {
+  datetime = get_datetime;
+  console.log("datetime:", datetime);
+}
+
+
+const dangercolors = [
+    '#8B0000', // Dark Red: 
+    '#B33A00', // Dark Orange Red:
+    '#D07300', // Orange Red: 
+    '#E6AB00', // Dark Orange: 
+    '#FFD700', // Orange: 
+    '#ABE600', // Yellow Green: 
+    '#73D000', // Green Yellow: 
+    '#3AB300', // Lime Green: 
+    '#00E600', // Light Green: 
+    '#008000', // Green: 
+]
+
+// Initialize the map and set its view to our chosen geographical coordinates and a zoom level
+let map = L.map('map').setView(coords, 16); // Zoom in more to see the spiral clearly
+
+// Add a tile layer (the background map image) to our map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+}).addTo(map);
+
+let center = L.latLng(coords[0], coords[1]);
+let marker = L.marker([coords[0], coords[1]]).addTo(map);
+
+// Calculate deltas in lat and lng for 100m at the center point
+let deltaLat = squareside / 110574; // Roughly 1 degree of latitude is 110.574 km
+let deltaLng = squareside / (111320 * Math.cos(center.lat * Math.PI/180)); // Roughly 1 degree of longitude is 111.320 km at the equator
+
+// Direction multipliers [Right, Down, Left, Up]
+let directions = [[1, 0], [0, -1], [-1, 0], [0, 1]];
+
+// Spiral pattern values
+let directionIndex = 0;
+let stepInCurrentDirection = 0;
+let stepLimitInCurrentDirection = 1;
+let switchDirectionAfterSteps = 2;
+let totalStepsTaken = 0;
+
+const token_usage = {
+  'prompt_tokens': 0,
+  'completion_tokens': 0,
+  'total_tokens': 0,
+};
+
+// let data = []
+
+const redIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+const blueIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+
+let xhrRequests = []; // To store all xhr requests
+let continueLoop = true;
+
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") {
+        // Abort the loop
+        continueLoop = false;
+
+        // Abort all xhr requests
+        for (let xhr of xhrRequests) {
+            xhr.abort();
+        }
+    }
+});
+
+
+
+let firstsquare = true;
+for (let i = 0; i < steps && continueLoop; i++) {
+  // Calculate the coordinates of the corners of the square
+  let southWest = L.latLng(center.lat - deltaLat/2, center.lng - deltaLng/2);
+  let northEast = L.latLng(center.lat + deltaLat/2, center.lng + deltaLng/2);
+
+  function queryRating(center, southWest, northEast, gender, age, travelmode) {
+    //example: center=37.99422,23.728501&southWest=37.99388086060014,23.72807354372182&northEast=37.994559139399854,23.728928456278183&gender=Man&age=35&travelmode=solo
+
+    const url = `http://localhost:8080/server.php?center=${center.lat},${center.lng}&southWest=${southWest.lat},${southWest.lng}&northEast=${northEast.lat},${northEast.lng}&city=${city}&gender=${gender}&age=${age}&travelmode=${travelmode}`;
+    console.log('url', url);
+
+    const xhr = new XMLHttpRequest();
+    xhrRequests.push(xhr); // Store the xhr request
+
+    xhr.open("GET", url);
+    xhr.send();
+    xhr.responseType = "json";
+    xhr.onload = () => {
+      if (xhr.readyState == 4 && xhr.status == 200) {
+        const res = xhr.response;
+
+        if (!res) {
+          console.log('res', res);
+          throw new Error('TypeError: res is null');
+        }
+
+        token_usage['prompt_tokens'] += res['usage']['prompt_tokens'];
+        token_usage['completion_tokens'] += res['usage']['completion_tokens'];
+        token_usage['total_tokens'] += res['usage']['total_tokens'];
+
+        let rating = res['rating'];
+        rating = parseInt(res['rating'], 10);
+        console.log('rating', rating);
+
+        // rating = Math.floor(rating / 10)
+
+        // random color:
+        // let squarecolor = Math.floor(Math.random() * 10);
+        let squarecolor = Math.floor(rating / 10);
+
+        // indicate danger by setting the marker icon
+        if (firstsquare) {
+          if (squarecolor <= 5) {
+            marker.setIcon(redIcon);
+          } else if (rating >= 80) {
+            marker.setIcon(greenIcon);
+          } else {
+            marker.setIcon(blueIcon);
+          }
+          firstsquare = false;
+        }
+
+        // Create a rectangle and add it to the map
+        let rect = L.rectangle([southWest, northEast], {
+          color: '#000',
+          fillColor: dangercolors[squarecolor],
+          fillOpacity: 0.4,
+        }).addTo(map);
+
+        rect.bindPopup(
+          "rating: " + rating + "<br />\n" +
+          "===: " + "<br />\n" +
+          `<a href='http://localhost:8080/server.php?center=${center.lat},${center.lng}&southWest=${southWest.lat},${southWest.lng}&northEast=${northEast.lat},${northEast.lng}&city=${city}&gender=${gender}&age=${age}&travelmode=${travelmode}'>server link</a>` + "<br />\n" 
+          //"center: " + center.lat + "," + center.lng + "<br />\n" +
+          //"southWest: " + southWest.lat + "," + southWest.lng + "<br />\n" +
+          //"northEast: " + northEast.lat + "," + northEast.lng
+        );
+
+        console.log('token_usage', token_usage);
+
+      } else {
+        console.log(`Error: ${xhr.status}`);
+      }
+
+      // Remove the xhr request from the array once it has completed
+      const index = xhrRequests.indexOf(xhr);
+      if (index > -1) {
+          xhrRequests.splice(index, 1);
+      }
+    } // xhr.onload 
+
+    xhr.onerror = () => {
+        // Handle the error, possibly due to an abort
+        const index = xhrRequests.indexOf(xhr);
+        if (index > -1) {
+            xhrRequests.splice(index, 1);
+        }
+    }
+
+  }
+  queryRating(center, southWest, northEast, gender=gender, age=age, travelmode=travelmode);
+
+
+  // Move to the next square
+  center.lng += directions[directionIndex][0] * deltaLng;
+  center.lat += directions[directionIndex][1] * deltaLat;
+
+  stepInCurrentDirection++;
+  totalStepsTaken++;
+  
+  // Switch direction if needed
+  if (stepInCurrentDirection === stepLimitInCurrentDirection) {
+    directionIndex = (directionIndex + 1) % directions.length;
+    stepInCurrentDirection = 0;
+
+    // Increase the step limit after moving in two directions
+    if (totalStepsTaken === switchDirectionAfterSteps) {
+      stepLimitInCurrentDirection++;
+      switchDirectionAfterSteps += 2;
+      totalStepsTaken = 0;
+    }
+  }
+} // for
+
+</script>
+
+</body>
+</html>

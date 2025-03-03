@@ -1,0 +1,17 @@
+{
+    "name": "jonas/web",
+    "autoload": {
+        "psr-4": {
+            "Jonas\\Web\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jonas",
+            "email": "jonaso@web.de"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^7.7"
+    }
+}

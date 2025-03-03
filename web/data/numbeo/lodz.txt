@@ -1,0 +1,35 @@
+Crime in Lodz, Poland
+
+Crime Index: 	40.55
+Safety Index: 	59.45
+
+Crime Index is an estimation of the overall level of crime in a given city or country. We consider crime levels lower than 20 as very low, crime levels between 20 and 40 as low, crime levels between 40 and 60 as moderate, crime levels between 60 and 80 as high, and crime levels higher than 80 as very high.
+Safety index is, on the other way, quite the opposite of the crime index. If the city has a high safety index, it is considered very safe. 
+
+Crime rates in Lodz, Poland
+Level of crime:	42.73	Moderate
+Crime increasing in the past 3 years:	39.26	Low
+Worries home broken and things stolen:	35.69	Low
+Worries being mugged or robbed:	39.82	Low
+Worries car stolen:	32.32	Low
+Worries things from car stolen:	40.28	Moderate
+Worries attacked:	44.82	Moderate
+Worries being insulted:	45.59	Moderate
+Worries being subject to a physical attack because of your skin color, ethnic origin, gender or religion:	43.63	Moderate
+Problem people using or dealing drugs:	30.75	Low
+Problem property crimes such as vandalism and theft:	51.98	Moderate
+Problem violent crimes such as assault and armed robbery:	31.05	Low
+Problem corruption and bribery:	43.75	Moderate
+
+Safety in Lodz, Poland
+Safety walking alone during daylight:	72.85	High
+Safety walking alone during night:	44.87	Moderate
+
+Contributors: 110
+Last update: July 2023
+These data are based on perceptions of visitors of this website in the past 3 years.
+If the value is 0, it means it is perceived as very low, and if the value is 100, it means it is perceived as very high. 
+
+1 Comments so far
+Anonymous on Sep 12, 2020:
+	Ironic, because statistically Lodz is the safest major city in Poland. That name was created in the early 90s back when it was actually dangerous. It's safe nowadays
