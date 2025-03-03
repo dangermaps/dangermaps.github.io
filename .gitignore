@@ -1,0 +1,7 @@
+web/vendor
+web/BAK
+web/cache
+web/composer.lock
+web/2-prompts-test.txt
+web/prompt-system.png
+web/prompt-user.png
