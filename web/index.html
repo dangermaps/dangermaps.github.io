@@ -55,6 +55,24 @@ const get_travelmode = urlParams.get('travelmode');
 const get_city = urlParams.get('city');
 const get_datetime = urlParams.get('datetime');
 
+if (!get_coords) {
+  alert(`Invalid Input.
+Specify url parameters, like this:
+
+http://localhost:8080/index.html?coords=6.248722073993096,-75.57116574129255&steps=12&city=medellin&gender=Man&age=35
+
+Available cities:
+athens, berlin, birmingham, budapest, helsinki, kiev, lodz, medellin, milan, reykjavik, singapore, tokyo, warsaw
+
+Optional parameters (any url-encoded string is fine):
+travelmode=solo
+city=Medellin
+squareside=75
+datetime=April%201,%202025%2011PM
+`);
+  throw new Error("Invalid usage.");
+}
+
 if (get_coords) {
   coords = get_coords.split(',');
   console.log("coords:", coords);
@@ -89,18 +107,93 @@ if (get_datetime) {
 }
 
 
+// const dangercolors = [
+//   // 0...10
+//     '#8B0000', // Dark Red: 
+//   // 10...20
+//   '#B33A00', // Dark Orange Red:
+//   // 20...30
+//   '#D07300', // Orange Red: 
+//   // 30...40
+//   '#E6AB00', // Dark Orange: 
+//   // 40...50
+//   '#FFD700', // Orange: 
+//   // 50...60
+//   '#ABE600', // Yellow Green: 
+//   // 60...70
+//   '#73D000', // Green Yellow: 
+//   // 70...80
+//   '#3AB300', // Lime Green: 
+//   // 80...90
+//   '#00E600', // Light Green: 
+//   // 90...100
+//   '#008000', // Green: 
+// ]
 const dangercolors = [
+  // 0...10
     '#8B0000', // Dark Red: 
-    '#B33A00', // Dark Orange Red:
-    '#D07300', // Orange Red: 
-    '#E6AB00', // Dark Orange: 
-    '#FFD700', // Orange: 
-    '#ABE600', // Yellow Green: 
-    '#73D000', // Green Yellow: 
-    '#3AB300', // Lime Green: 
-    '#00E600', // Light Green: 
-    '#008000', // Green: 
+  // 10...20
+  '#8B0000', // Dark Red:
+  // 20...30
+  '#8B0000', // Dark Red: 
+  // 30...40
+  '#B33A00', // Dark Orange Red: 
+  // 40...50
+  '#B33A00', // Dark Orange Red: 
+  // 50...60
+  '#FFD700', // Orange: 
+  // 60...70
+  '#FFD700', // Orange: 
+  // '#ABE600', // Yellow Green: 
+  // 70...80
+  '#73D000', // Green Yellow: 
+  // 80...90
+  '#00E600', // Light Green: 
+  // 90...100
+  '#008000', // Green: 
 ]
+// const dangercolors = [
+//   // 0...5
+//   '#8B0000', // Dark Red: 
+//   // 5...10
+//   '#8B0000', // Dark Red: 
+//   // 10...15
+//   '#8B0000', // Dark Red: 
+//   // 15...20
+//   '#8B0000', // Dark Red:
+//   // 20...25
+//   '#8B0000', // Dark Red:
+//   // 25...30
+//   '#8B0000', // Dark Red: 
+//   // 30...35
+//   '#B33A00', // Dark Orange Red: 
+//   // 35...40
+//   '#B33A00', // Dark Orange Red: 
+//   // 40...45
+//   '#D07300', // Orange Red: 
+//   // 45...50
+//   '#D07300', // Orange Red: 
+//   // 50...55
+//   '#E6AB00', // Dark Orange: 
+//   // 55...60
+//   '#E6AB00', // Dark Orange: 
+//   // 60...65
+//   '#FFD700', // Orange: 
+//   // 65...70
+//   '#ABE600', // Yellow Green: 
+//   // 70...75
+//   '#73D000', // Green Yellow: 
+//   // 75...80
+//   '#00E600', // Light Green: 
+//   // 80...85
+//   '#00E600', // Light Green: 
+//   // 85...90
+//   '#00E600', // Light Green: 
+//   // 90...95
+//   '#008000', // Green: 
+//   // 95...100
+//   '#008000', // Green: 
+// ]
 
 // Initialize the map and set its view to our chosen geographical coordinates and a zoom level
 let map = L.map('map').setView(coords, 16); // Zoom in more to see the spiral clearly
@@ -179,121 +272,129 @@ document.addEventListener('keydown', function(event) {
 
 
 
-let firstsquare = true;
-for (let i = 0; i < steps && continueLoop; i++) {
-  // Calculate the coordinates of the corners of the square
-  let southWest = L.latLng(center.lat - deltaLat/2, center.lng - deltaLng/2);
-  let northEast = L.latLng(center.lat + deltaLat/2, center.lng + deltaLng/2);
+let requestQueue = [];
+let isProcessing = false;
 
-  function queryRating(center, southWest, northEast, gender, age, travelmode) {
+async function processQueue() {
+    if (isProcessing || requestQueue.length === 0) return;
+
+    isProcessing = true;
+    while (requestQueue.length > 0) {
+        const { center, southWest, northEast, gender, age, travelmode, resolve, reject } = requestQueue.shift();
+        try {
+            const result = await queryRating(center, southWest, northEast, gender, age, travelmode);
+            resolve(result);
+        } catch (error) {
+            reject(error);
+        }
+    }
+    isProcessing = false;
+}
+
+function addToQueue(center, southWest, northEast, gender, age, travelmode) {
+    return new Promise((resolve, reject) => {
+        requestQueue.push({ center, southWest, northEast, gender, age, travelmode, resolve, reject });
+        processQueue();
+    });
+}
+
+let lastrating;
+
+async function queryRating(center, southWest, northEast, gender, age, travelmode) {
     //example: center=37.99422,23.728501&southWest=37.99388086060014,23.72807354372182&northEast=37.994559139399854,23.728928456278183&gender=Man&age=35&travelmode=solo
 
-    const url = `http://localhost:8080/server.php?center=${center.lat},${center.lng}&southWest=${southWest.lat},${southWest.lng}&northEast=${northEast.lat},${northEast.lng}&city=${city}&gender=${gender}&age=${age}&travelmode=${travelmode}`;
+    let url = `http://localhost:8080/server.php?center=${center.lat},${center.lng}&southWest=${southWest.lat},${southWest.lng}&northEast=${northEast.lat},${northEast.lng}&city=${city}&gender=${gender}&age=${age}&travelmode=${travelmode}`;
+    if (datetime) {
+      url = url + "&datetime=" + datetime;
+    }
     console.log('url', url);
 
-    const xhr = new XMLHttpRequest();
-    xhrRequests.push(xhr); // Store the xhr request
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
-    xhr.open("GET", url);
-    xhr.send();
-    xhr.responseType = "json";
-    xhr.onload = () => {
-      if (xhr.readyState == 4 && xhr.status == 200) {
-        const res = xhr.response;
+        // debugging
+        const text = await response.text(); // Read response as text
+        console.log('Raw response:', text); // Log raw response
 
-        if (!res) {
-          console.log('res', res);
-          throw new Error('TypeError: res is null');
+        let res;
+        try {
+            res = JSON.parse(text); // Attempt to parse JSON
+        } catch (jsonError) {
+            throw new Error(`JSON Parse Error: ${jsonError.message}\nResponse: ${text}`);
         }
+        // const res = await response.json();
+        if (!res) throw new Error('TypeError: res is null');
 
         token_usage['prompt_tokens'] += res['usage']['prompt_tokens'];
         token_usage['completion_tokens'] += res['usage']['completion_tokens'];
         token_usage['total_tokens'] += res['usage']['total_tokens'];
 
-        let rating = res['rating'];
-        rating = parseInt(res['rating'], 10);
+        let rating = parseInt(res['rating'], 10);
         console.log('rating', rating);
 
-        // rating = Math.floor(rating / 10)
+        let colorindex = Math.floor((rating / 100) * dangercolors.length);
+        colorindex = Math.max(0, colorindex);
+        let squarecolor = dangercolors[colorindex];
 
-        // random color:
-        // let squarecolor = Math.floor(Math.random() * 10);
-        let squarecolor = Math.floor(rating / 10);
-
-        // indicate danger by setting the marker icon
         if (firstsquare) {
-          if (squarecolor <= 5) {
-            marker.setIcon(redIcon);
-          } else if (rating >= 80) {
-            marker.setIcon(greenIcon);
-          } else {
-            marker.setIcon(blueIcon);
-          }
-          firstsquare = false;
+            if (rating <= 20) marker.setIcon(redIcon);
+            else if (rating >= 80) marker.setIcon(greenIcon);
+            else marker.setIcon(blueIcon);
+            firstsquare = false;
         }
 
-        // Create a rectangle and add it to the map
         let rect = L.rectangle([southWest, northEast], {
-          color: '#000',
-          fillColor: dangercolors[squarecolor],
-          fillOpacity: 0.4,
+            color: '#000',
+            fillColor: squarecolor,
+            fillOpacity: 0.4,
         }).addTo(map);
 
         rect.bindPopup(
-          "rating: " + rating + "<br />\n" +
-          "===: " + "<br />\n" +
-          `<a href='http://localhost:8080/server.php?center=${center.lat},${center.lng}&southWest=${southWest.lat},${southWest.lng}&northEast=${northEast.lat},${northEast.lng}&city=${city}&gender=${gender}&age=${age}&travelmode=${travelmode}'>server link</a>` + "<br />\n" 
-          //"center: " + center.lat + "," + center.lng + "<br />\n" +
-          //"southWest: " + southWest.lat + "," + southWest.lng + "<br />\n" +
-          //"northEast: " + northEast.lat + "," + northEast.lng
+            `rating: ${rating}<br />
+            color: ${dangercolors[colorindex]} (${colorindex})<br />
+            <a href='${url}'>server link</a>`
         );
 
         console.log('token_usage', token_usage);
 
-      } else {
-        console.log(`Error: ${xhr.status}`);
-      }
+        return rating;
 
-      // Remove the xhr request from the array once it has completed
-      const index = xhrRequests.indexOf(xhr);
-      if (index > -1) {
-          xhrRequests.splice(index, 1);
-      }
-    } // xhr.onload 
-
-    xhr.onerror = () => {
-        // Handle the error, possibly due to an abort
-        const index = xhrRequests.indexOf(xhr);
-        if (index > -1) {
-            xhrRequests.splice(index, 1);
-        }
+    } catch (error) {
+        console.error('Request failed:', error);
+        throw error;
     }
 
-  }
-  queryRating(center, southWest, northEast, gender=gender, age=age, travelmode=travelmode);
+} // queryRating
 
 
-  // Move to the next square
-  center.lng += directions[directionIndex][0] * deltaLng;
-  center.lat += directions[directionIndex][1] * deltaLat;
+let firstsquare = true;
+(async () => {
+  for (let i = 0; i < steps && continueLoop; i++) {
+    // Calculate the coordinates of the corners of the square
+    let southWest = L.latLng(center.lat - deltaLat/2, center.lng - deltaLng/2);
+    let northEast = L.latLng(center.lat + deltaLat/2, center.lng + deltaLng/2);
 
-  stepInCurrentDirection++;
-  totalStepsTaken++;
-  
-  // Switch direction if needed
-  if (stepInCurrentDirection === stepLimitInCurrentDirection) {
-    directionIndex = (directionIndex + 1) % directions.length;
-    stepInCurrentDirection = 0;
+    await addToQueue(center, southWest, northEast, gender, age, travelmode);
 
-    // Increase the step limit after moving in two directions
-    if (totalStepsTaken === switchDirectionAfterSteps) {
-      stepLimitInCurrentDirection++;
-      switchDirectionAfterSteps += 2;
-      totalStepsTaken = 0;
+    // Move to the next square
+    center.lng += directions[directionIndex][0] * deltaLng;
+    center.lat += directions[directionIndex][1] * deltaLat;
+
+    stepInCurrentDirection++;
+    totalStepsTaken++;
+    if (stepInCurrentDirection === stepLimitInCurrentDirection) {
+      directionIndex = (directionIndex + 1) % directions.length;
+      stepInCurrentDirection = 0;
+
+      if (totalStepsTaken === switchDirectionAfterSteps) {
+          stepLimitInCurrentDirection++;
+          switchDirectionAfterSteps += 2;
+          totalStepsTaken = 0;
+      }
     }
-  }
-} // for
-
+  } // for
+})();
 </script>
 
 </body>

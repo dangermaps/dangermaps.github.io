@@ -901,7 +901,10 @@ $poi_str = formatPOIs($response, $center);
 // }
 
 
-$crimeincountry = file_get_contents('./data/wikipedia/crime-in-country/crime-in-'.strtolower($country).'.md');
+$country_filename = str_replace('federal republic of ', '', strtolower($country));
+
+
+$crimeincountry = file_get_contents('./data/wikipedia/crime-in-country/crime-in-'.$country_filename.'.md');
 $crimeincountry = token_saving($crimeincountry);
 
 $cityadvisory = file_get_contents('./data/numbeo/'.strtolower($city).'.txt');;
@@ -933,7 +936,7 @@ $prompt = str_replace("{{cityadvisory}}", $cityadvisory, $prompt);
 
 
 try {
-  $advisory = file_get_contents('./data/advisory/'.strtolower($country).'.md');
+  $advisory = file_get_contents('./data/advisory/'.$country_filename.'.md');
 } catch (Exception $e) {
   $advisory = '-';
 }
@@ -1012,8 +1015,12 @@ function getChatCompletion($system, $prompt) {
     return $cached;
   }
 
+  // *******************************
   $model = 'gpt-3.5-turbo-16k'; // 'gpt-4-0613'; // 32k context: "gpt-4-32k" // not available as of July 2023;
-
+  // $model = 'gpt-4o-2024-08-06';
+  // $model = 'gpt-4-turbo-2024-04-09';
+  // *******************************
+  
   $client = new Client(['base_uri' => 'https://api.openai.com']);
 
   $openaiApiKey = getenv('OPENAI_API_KEY');
